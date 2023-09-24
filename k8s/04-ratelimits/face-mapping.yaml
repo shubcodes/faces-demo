@@ -1,21 +1,21 @@
 ---
-apiVersion: getambassador.io/v3alpha1
-kind: Mapping
+kind: NgrokModuleSet
+apiVersion: ingress.k8s.ngrok.com/v1alpha1
 metadata:
-  name: face-mapping
+  name: faces-demo
   namespace: faces
-spec:
-  hostname: "*"
-  prefix: /face/
-  service: face.faces
-  timeout_ms: 250
-  retry_policy:
-    retry_on: 5xx
-    num_retries: 1
-  labels:
-    emissary:
-    - request_label_group:
-      - x-emissary-test-allow:
-        generic_key:
-          key: mykey
-          value: myvalue  
+modules:
+  compression:
+    enabled: true
+  tlsTermination:
+    minVersion: "1.3"
+  oauth:
+    google:
+      emailDomains:
+      - ngrok.com
+  circuitBreaker:
+    errorThresholdPercentage: "0.50"
+    trippedDuration: 10s
+    rollingWindow: 60s
+    numBuckets: 10
+    volumeThreshold: 20
