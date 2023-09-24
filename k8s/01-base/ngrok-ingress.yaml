@@ -1,0 +1,57 @@
+---
+kind: NgrokModuleSet
+apiVersion: ingress.k8s.ngrok.com/v1alpha1
+metadata:
+  name: faces-demo
+  namespace: faces
+modules:
+  compression:
+    enabled: true
+  tlsTermination:
+    minVersion: "1.3"
+  oauth:
+    google:
+      emailDomains:
+      - ngrok.com
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress 
+metadata:
+  namespace: faces
+  name: faces-demo
+  annotations:
+    k8s.ngrok.com/modules: faces-demo
+spec:
+  ingressClassName: ngrok
+  rules:
+  - host: faces.jonstacks.xyz
+    http:
+      paths:
+      - path: /color/
+        pathType: Prefix
+        backend:
+          service:
+            name: color
+            port:
+              number: 80
+      - path: /face/
+        pathType: Prefix
+        backend:
+          service:
+            name: face
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: faces-gui
+            port:
+              number: 80
+      - path: /smiley/
+        pathType: Prefix
+        backend:
+          service:
+            name: smiley
+            port:
+              number: 80
