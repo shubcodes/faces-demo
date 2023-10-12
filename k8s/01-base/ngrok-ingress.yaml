@@ -24,7 +24,7 @@ metadata:
 spec:
   ingressClassName: ngrok
   rules:
-  - host: faces.jonstacks.xyz
+  - host: faces-demo-linkerd.ngrok.io
     http:
       paths:
       - path: /color/
