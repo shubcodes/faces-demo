@@ -20,20 +20,18 @@ When you use `demosh` to run this file, your cluster will be checked for you.
 ---
 <!-- @SHOW -->
 
-# Emissary and Linkerd Resilience Patterns
-## Rate Limits, Retries, and Timeouts
+# Linkerd Resilience Patterns using ngrok Ingress
 
 We're going to show various resilience techniques using the Faces demo (from
 https://github.com/BuoyantIO/faces-demo):
 
-- _Rate limits_ protect services by restricting the amount of traffic that can
-  flow through to a service;
-- _Retries_ automatically repeat requests that fail; and
-- _Timeouts_ cut off requests that take too long.
+- _Retries_ automatically repeat requests that fail
+- _Timeouts_ cut off requests that take too long
 
-All are important techniques for resilience, and all can be applied - at
-various points in the call stack - by infrastructure components like the
-ingress controller and/or service mesh.
+Both are important techniques for resilience, and can be applied at various
+points in the call stack by infrastructure components like the ingress
+controller and/or service mesh. For this demo, we'll use ngrok-ingress to
+provide access to the Faces demo, and Linkerd to provide resilience.
 
 Let's start with a quick look at Faces in the web browser. You'll be able to
 see that it's in pretty sorry shape, and you'll be able to look at the Linkerd
@@ -44,17 +42,22 @@ dashboard to see how much traffic it generates.
 ## RETRIES
 
 Let's start by going after the red frowning faces: those are the ones where
-the face service itself is failing. We can tell Emissary to retry those when
-they fail, by adding a `retry_policy` to the Mapping for `/face/`:
+the face service itself is failing. We can tell Linkerd to retry those when
+they fail, by adding `isRetryable: true` to the ServiceProfile for the `face`
+workload:
 
 ```bash
-diff -u99 --color k8s/{01-base,02-retries}/face-mapping.yaml
+diff -u99 --color k8s/{01-base,02-retries}/face-profile.yaml
 ```
 
-We'll apply those...
+Linkerd uses a _retry budget_ for retries: as long as the total number of
+retries doesn't exceed the budget (20% by default), Linkerd will just keep
+retrying.
+
+We'll apply the change to the ServiceProfile...
 
 ```bash
-kubectl apply -f k8s/02-retries/face-mapping.yaml
+kubectl apply -f k8s/02-retries/face-profile.yaml
 ```
 
 ...then go take a look at the results in the browser.
@@ -63,49 +66,11 @@ kubectl apply -f k8s/02-retries/face-mapping.yaml
 
 ## RETRIES continued
 
-So that helped quite a bit: it's not perfect, because Emissary will only retry
-once, but it definitely cuts down on problems! Let's continue by adding a
-retry for the smiley service, too, to try to get rid of the cursing faces:
-
-```bash
-diff -u99 --color k8s/{01-base,02-retries}/smiley-mapping.yaml
-```
-
-Let's apply those and go take a look in the browser.
-
-```bash
-kubectl apply -f k8s/02-retries/smiley-mapping.yaml
-```
-
-<!-- @browser_then_terminal -->
-
-## RETRIES continued
-
-That... had no effect. If we take a look back at the overall application
-diagram, the reason is clear...
-
-<!-- @wait -->
-<!-- @show_slides -->
-<!-- @wait -->
-<!-- @clear -->
-<!-- @show_terminal -->
-
-...Emissary never talks to the smiley service! so telling Emissary to retry
-the failed call will never work.
-
-Instead, we need to tell Linkerd to do the retries, by adding `isRetryable` to
-the `ServiceProfile` for the smiley service:
+So that helped quite a bit! Let's continue by adding a retry for the smiley
+service, too, to try to get rid of the cursing faces:
 
 ```bash
 diff -u99 --color k8s/{01-base,02-retries}/smiley-profile.yaml
-```
-
-This is different from the Emissary version because Linkerd uses a _retry
-budget_ instead of a counter: as long as the total number of retries doesn't
-exceed the budget, Linkerd will just keep retrying. Let's apply that and take
-a look.
-
-```bash
 kubectl apply -f k8s/02-retries/smiley-profile.yaml
 ```
 
@@ -176,8 +141,7 @@ kubectl apply -f k8s/03-timeouts/smiley-profile.yaml
 ## TIMEOUTS continued
 
 Finally, we'll add a timeout that lets the GUI decide what to do if the face
-service itself takes too long. We'll use Emissary for this (although we
-could've used Linkerd, since Emissary is itself in the mesh).
+service itself takes too long.
 
 When the GUI sees a timeout talking to the face service, it will just keep
 showing the user the old data for awhile. There are a lot of applications
@@ -191,61 +155,16 @@ For the moment, too, the GUI will show a counter of timed-out attempts, to
 make it a little more clear what's going on.
 
 ```bash
-diff -u99 --color k8s/{02-retries,03-timeouts}/face-mapping.yaml
-kubectl apply -f k8s/03-timeouts/face-mapping.yaml
-```
-
-<!-- @browser_then_terminal -->
-
-## RATELIMITS
-
-Given retries and timeouts, things look better -- still far from perfect, but
-better. Suppose, though, that someone now adds some code to the face service
-that makes it just completely collapse under heavy load? Sadly, this is often
-all-too-easy to mistakenly do.
-
-Let's simulate this. The face service has internal functionality to limit its
-abilities under load when we set the `MAX_RATE` environment variable, so we'll
-do that now:
-
-```bash
-kubectl set env deploy -n faces face MAX_RATE=8.5
-```
-
-Once that's done, we can take a look in the browser to see what happens.
-
-<!-- @browser_then_terminal -->
-
-## RATELIMITS continued
-
-Since the face service is right on the edge, we can have Emissary enforce a
-rate limit on requests to the face service. This is both protecting the
-service (by reducing the traffic) **and** providing agency to the client (by
-providing a specific status code when the limit is hit). Here, our web app is
-going to handle rate limits just like it handles timeouts.
-
-Actually setting the rate limit is one of the messier bits of Emissary: the
-most important thing here is to realize that we're actually providing a
-**label** on the requests, and that the external rate limit service is
-counting traffic with that label to decide what response to hand back.
-
-```bash
-diff -u99 --color k8s/{03-timeouts,04-ratelimits}/face-mapping.yaml
-```
-
-For this demo, our rate limit service is preconfigured to allow 8 requests per
-second. Let's apply this and see how things look:
-
-```bash
-kubectl apply -f k8s/04-ratelimits/face-mapping.yaml
+diff -u99 --color k8s/{02-retries,03-timeouts}/face-profile.yaml
+kubectl apply -f k8s/03-timeouts/face-profile.yaml
 ```
 
 <!-- @browser_then_terminal -->
 
 # SUMMARY
 
-We've used both Emissary and Linkerd to take a very, very broken application
-and turn it into something the user might actually have an OK experience with.
+We've been able to use Linkerd to take a very, very broken application and
+turn it into something the user might actually have an OK experience with.
 Fixing the application is, of course, still necessary!! but making the user
 experience better is a good thing.
 

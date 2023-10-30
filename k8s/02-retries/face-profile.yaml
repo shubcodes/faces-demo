@@ -10,3 +10,4 @@ spec:
   - condition:
       method: GET
     name: GET /
+    isRetryable: true
