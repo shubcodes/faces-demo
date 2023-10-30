@@ -13,7 +13,6 @@ is just before a commented `@SHOW` directive) will get displayed.
 When you use `demosh` to run this file, your cluster will be checked for you.
 
 <!-- set -e >
-<!-- @import demosh/demo-tools.sh -->
 <!-- @import demosh/check-requirements.sh -->
 
 <!-- @start_livecast -->
