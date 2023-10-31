@@ -10,3 +10,5 @@ spec:
   - condition:
       method: GET
     name: GET /
+    isRetryable: true
+    timeout: 250ms

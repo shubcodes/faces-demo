@@ -32,10 +32,11 @@ k3d cluster delete $CLUSTER &>/dev/null
 #@SHOW
 
 # Expose ports 80 and 443 to the local host, so that our ingress can work.
-# Also, don't install traefik, since we'll be putting Linkerd on instead.
+# Also, don't install local storage, traefik, or the metrics server -- we
+# don't need them, and it saves a bit of resources not to install them.
 k3d cluster create $CLUSTER \
     -p "80:80@loadbalancer" -p "443:443@loadbalancer" \
-    --k3s-arg '--disable=traefik@server:*;agents:*'
+    --k3s-arg '--disable=local-storage,traefik,metrics-server@server:*;agents:*'
 
 #@wait
 #@HIDE
